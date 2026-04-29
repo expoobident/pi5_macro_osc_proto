@@ -79,6 +79,28 @@ python3 -m src.smoke_test --simulate
 The smoke test checks waveform generation, DAC clamping, DAC0/DAC1 simulation
 mapping, and that simulation mode does not import the hardware backends.
 
+## Control monitor
+Control mapping:
+- AD4 = pitch
+- AD1 = timbre
+- AD2 = morph
+- AD3 = index
+
+Run the control monitor in simulation mode first:
+
+```bash
+python3 -m src.control_monitor --simulate --samples 10
+python3 -m src.control_monitor --simulate --samples 10 --csv
+python3 -m src.control_monitor --simulate --samples 10 --json
+```
+
+The monitor prints raw values, calibrated normalized values from 0.0-1.0, and
+mapped control values. Pitch is mapped to Hz; timbre, morph, and index are
+reported as normalized control values.
+
+Real ADC reading requires `--enable-input` and should only be done while you
+are present at the bench.
+
 ## Calibration
 Default calibration lives in:
 
@@ -101,6 +123,16 @@ python3 -m src.calibrate
 This command only prints instructions. Real output still requires using the DAC
 test utility with `--enable-output`, and only while watching the meter or scope.
 Measured full-scale may be around 3.28V instead of exactly 3.30V.
+
+Print safe ADC calibration steps:
+
+```bash
+python3 -m src.adc_calibrate
+```
+
+ADC calibration uses `adc_min` and `adc_max` entries in `config/calibration.json`
+for AD1, AD2, AD3, and AD4. Missing or malformed calibration files fall back to
+safe defaults.
 
 ## Pokit Pro bench notes
 - Pokit black/COM to GND.

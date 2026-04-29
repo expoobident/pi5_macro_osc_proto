@@ -52,6 +52,12 @@ def calibration_from_mapping(data: dict[str, Any]) -> Calibration:
     adc_data = data.get("adc", {})
     if not isinstance(adc_data, dict):
         adc_data = {}
+    adc_min_data = data.get("adc_min", {})
+    if not isinstance(adc_min_data, dict):
+        adc_min_data = {}
+    adc_max_data = data.get("adc_max", {})
+    if not isinstance(adc_max_data, dict):
+        adc_max_data = {}
 
     adc: dict[str, AdcCalibration] = {}
     for channel, channel_default in defaults.adc.items():
@@ -59,8 +65,16 @@ def calibration_from_mapping(data: dict[str, Any]) -> Calibration:
         if not isinstance(channel_data, dict):
             channel_data = {}
         adc[channel] = AdcCalibration(
-            minimum=_float_from_mapping(channel_data, "min", channel_default.minimum),
-            maximum=_float_from_mapping(channel_data, "max", channel_default.maximum),
+            minimum=_float_from_mapping(
+                adc_min_data,
+                channel,
+                _float_from_mapping(channel_data, "min", channel_default.minimum),
+            ),
+            maximum=_float_from_mapping(
+                adc_max_data,
+                channel,
+                _float_from_mapping(channel_data, "max", channel_default.maximum),
+            ),
         )
 
     return Calibration(
@@ -118,3 +132,28 @@ def apply_dac_calibration(
 ) -> float:
     dac_calibration = dac_calibration_for_channel(calibration, channel)
     return volts * dac_calibration.gain + dac_calibration.offset_volts
+
+
+def adc_calibration_for_channel(
+    calibration: Calibration,
+    channel: str,
+) -> AdcCalibration:
+    normalized = channel.upper()
+    try:
+        return calibration.adc[normalized]
+    except KeyError as exc:
+        raise ValueError("channel must be one of AD1, AD2, AD3, AD4") from exc
+
+
+def normalize_adc_value(
+    raw_value: float,
+    channel: str,
+    calibration: Calibration,
+) -> float:
+    adc_calibration = adc_calibration_for_channel(calibration, channel)
+    span = adc_calibration.maximum - adc_calibration.minimum
+    if span <= 0.0:
+        return 0.0
+
+    normalized = (raw_value - adc_calibration.minimum) / span
+    return max(0.0, min(1.0, normalized))

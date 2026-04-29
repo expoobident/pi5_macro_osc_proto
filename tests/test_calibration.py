@@ -9,6 +9,7 @@ from src.calibration import (
     apply_dac_calibration,
     default_calibration,
     load_calibration,
+    normalize_adc_value,
 )
 from src.dac_output import dac_value_from_voltage, voltage_to_u16
 
@@ -24,6 +25,57 @@ class CalibrationTests(unittest.TestCase):
         self.assertEqual(set(calibration.adc), {"AD1", "AD2", "AD3", "AD4"})
         self.assertEqual(calibration.adc["AD1"].minimum, 0.0)
         self.assertEqual(calibration.adc["AD1"].maximum, 1.0)
+
+    def test_adc_normalization_uses_calibration_min_max(self) -> None:
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "calibration.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "adc_min": {"AD1": 10.0},
+                        "adc_max": {"AD1": 20.0},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            calibration = load_calibration(path)
+
+        self.assertEqual(normalize_adc_value(10.0, "AD1", calibration), 0.0)
+        self.assertEqual(normalize_adc_value(15.0, "AD1", calibration), 0.5)
+        self.assertEqual(normalize_adc_value(20.0, "AD1", calibration), 1.0)
+
+    def test_adc_normalization_clamps_below_min_and_above_max(self) -> None:
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "calibration.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "adc_min": {"AD4": 100.0},
+                        "adc_max": {"AD4": 200.0},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            calibration = load_calibration(path)
+
+        self.assertEqual(normalize_adc_value(50.0, "AD4", calibration), 0.0)
+        self.assertEqual(normalize_adc_value(250.0, "AD4", calibration), 1.0)
+
+    def test_adc_normalization_handles_invalid_span(self) -> None:
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "calibration.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "adc_min": {"AD2": 1.0},
+                        "adc_max": {"AD2": 1.0},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            calibration = load_calibration(path)
+
+        self.assertEqual(normalize_adc_value(1.0, "AD2", calibration), 0.0)
 
     def test_gain_and_offset_apply_before_dac_code_conversion(self) -> None:
         with TemporaryDirectory() as tmp:
