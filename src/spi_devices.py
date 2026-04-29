@@ -5,15 +5,17 @@ import threading
 import spidev
 
 from . import config
-from .dac_output import bipolar_to_u16, clamp_u16, voltage_to_u16
+from .calibration import Calibration, load_calibration
+from .dac_output import bipolar_to_u16, bipolar_to_voltage, clamp_u16, voltage_to_u16
 from .gpio_backend import GPIOBackend
 
 SPI_LOCK = threading.Lock()
 
 
 class DAC8552:
-    def __init__(self, gpio: GPIOBackend) -> None:
+    def __init__(self, gpio: GPIOBackend, calibration: Calibration | None = None) -> None:
         self.gpio = gpio
+        self.calibration = calibration if calibration is not None else load_calibration()
         self.spi = spidev.SpiDev()
         self.spi.open(config.SPI_BUS, config.SPI_DEVICE_DAC)
         self.spi.max_speed_hz = config.DAC_SPI_HZ
@@ -45,16 +47,22 @@ class DAC8552:
             self.gpio.write(config.PIN_DAC_CS, 1)
 
     def write_a(self, value: float) -> None:
-        self.write_raw(False, self._float_to_u16(value))
+        self.write_raw(
+            False,
+            voltage_to_u16(bipolar_to_voltage(value), "DAC0", self.calibration),
+        )
 
     def write_b(self, value: float) -> None:
-        self.write_raw(True, self._float_to_u16(value))
+        self.write_raw(
+            True,
+            voltage_to_u16(bipolar_to_voltage(value), "DAC1", self.calibration),
+        )
 
     def write_voltage_a(self, voltage: float) -> None:
-        self.write_raw(False, voltage_to_u16(voltage))
+        self.write_raw(False, voltage_to_u16(voltage, "DAC0", self.calibration))
 
     def write_voltage_b(self, voltage: float) -> None:
-        self.write_raw(True, voltage_to_u16(voltage))
+        self.write_raw(True, voltage_to_u16(voltage, "DAC1", self.calibration))
 
     def close(self) -> None:
         self.spi.close()

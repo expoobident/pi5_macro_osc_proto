@@ -5,6 +5,7 @@ import unittest
 
 from src.dac_output import (
     DAC_MAX_CODE,
+    calibrated_voltage,
     bipolar_to_u16,
     bipolar_to_voltage,
     clamp_u16,
@@ -12,6 +13,7 @@ from src.dac_output import (
     dac_value_from_voltage,
     voltage_to_u16,
 )
+from src.calibration import Calibration, DacCalibration, default_calibration
 
 
 class DacOutputTests(unittest.TestCase):
@@ -47,6 +49,22 @@ class DacOutputTests(unittest.TestCase):
 
         self.assertEqual(dac_value.voltage, 3.3)
         self.assertEqual(dac_value.code, DAC_MAX_CODE)
+
+    def test_dac_value_from_voltage_applies_channel_calibration(self) -> None:
+        calibration = Calibration(
+            dac0=DacCalibration(gain=2.0, offset_volts=0.2),
+            dac1=DacCalibration(gain=0.5, offset_volts=0.1),
+            adc=default_calibration().adc,
+        )
+
+        self.assertAlmostEqual(
+            calibrated_voltage(1.0, "DAC0", calibration),
+            2.2,
+        )
+        self.assertAlmostEqual(
+            dac_value_from_voltage(1.0, "DAC1", calibration).voltage,
+            0.6,
+        )
 
 
 if __name__ == "__main__":

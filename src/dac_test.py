@@ -6,6 +6,7 @@ import sys
 import time
 from typing import Any, TextIO
 
+from .calibration import Calibration, load_calibration
 from .dac_output import (
     DAC_MAX_VOLTAGE,
     DacValue,
@@ -76,6 +77,7 @@ def generate_rows(
     volts: float | None,
     seconds: float,
     rate_hz: float,
+    calibration: Calibration | None = None,
 ) -> list[DacTestRow]:
     if pattern not in PATTERNS:
         raise ValueError(f"pattern must be one of: {', '.join(PATTERNS)}")
@@ -84,13 +86,16 @@ def generate_rows(
     target_voltage = resolve_target_voltage(pattern, volts)
     timestamps = sample_timestamps(seconds, rate_hz)
     count = len(timestamps)
+    active_calibration = calibration if calibration is not None else load_calibration()
 
     return [
         DacTestRow(
             timestamp_s=timestamp,
             channel=normalized_channel,
             dac_value=dac_value_from_voltage(
-                pattern_voltage(pattern, target_voltage, index, count)
+                pattern_voltage(pattern, target_voltage, index, count),
+                normalized_channel,
+                active_calibration,
             ),
         )
         for index, timestamp in enumerate(timestamps)
@@ -111,8 +116,12 @@ def print_row(row: DacTestRow, stdout: TextIO) -> None:
     )
 
 
-def run_simulation(rows: list[DacTestRow], stdout: TextIO) -> SimulationDAC:
-    dac = SimulationDAC()
+def run_simulation(
+    rows: list[DacTestRow],
+    stdout: TextIO,
+    calibration: Calibration | None = None,
+) -> SimulationDAC:
+    dac = SimulationDAC(calibration=calibration)
     print("Simulation mode: no GPIO, SPI, ADC, or DAC hardware will be opened.", file=stdout)
     print_header(stdout)
     for row in rows:
@@ -121,12 +130,16 @@ def run_simulation(rows: list[DacTestRow], stdout: TextIO) -> SimulationDAC:
     return dac
 
 
-def run_hardware(rows: list[DacTestRow], stdout: TextIO) -> None:
+def run_hardware(
+    rows: list[DacTestRow],
+    stdout: TextIO,
+    calibration: Calibration | None = None,
+) -> None:
     from .gpio_backend import GPIOBackend
     from .spi_devices import DAC8552
 
     gpio = GPIOBackend()
-    dac = DAC8552(gpio)
+    dac = DAC8552(gpio, calibration=calibration)
     start = time.monotonic()
 
     try:
@@ -186,6 +199,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="allow real GPIO/SPI/DAC output",
     )
+    parser.add_argument(
+        "--calibration",
+        default=None,
+        help="path to calibration JSON; defaults to config/calibration.json",
+    )
     return parser
 
 
@@ -197,20 +215,22 @@ def main(argv: list[str] | None = None, stdout: TextIO = sys.stdout) -> None:
         parser.error("--simulate and --enable-output cannot be used together")
 
     try:
+        calibration = load_calibration(args.calibration)
         rows = generate_rows(
             pattern=args.pattern,
             channel=args.channel,
             volts=args.volts,
             seconds=args.seconds,
             rate_hz=args.rate_hz,
+            calibration=calibration,
         )
     except ValueError as exc:
         parser.error(str(exc))
 
     if args.enable_output:
-        run_hardware(rows, stdout)
+        run_hardware(rows, stdout, calibration=calibration)
     else:
-        run_simulation(rows, stdout)
+        run_simulation(rows, stdout, calibration=calibration)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ from io import StringIO
 import unittest
 
 from src.dac_output import DAC_MAX_CODE
+from src.calibration import Calibration, DacCalibration, default_calibration
 from src.dac_test import (
     generate_rows,
     main,
@@ -48,6 +49,24 @@ class DacTestUtilityTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0].dac_value.voltage, 3.3)
         self.assertEqual(rows[0].dac_value.code, DAC_MAX_CODE)
+
+    def test_generate_rows_applies_channel_calibration(self) -> None:
+        calibration = Calibration(
+            dac0=DacCalibration(gain=1.0, offset_volts=0.0),
+            dac1=DacCalibration(gain=2.0, offset_volts=0.1),
+            adc=default_calibration().adc,
+        )
+
+        rows = generate_rows(
+            pattern="steady",
+            channel="DAC1",
+            volts=1.0,
+            seconds=0.0,
+            rate_hz=1.0,
+            calibration=calibration,
+        )
+
+        self.assertEqual(rows[0].dac_value.voltage, 2.1)
 
     def test_simulation_output_path_prints_table_and_records_write(self) -> None:
         stdout = StringIO()

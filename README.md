@@ -69,6 +69,39 @@ python3 -m src.dac_test --channel DAC1 --pattern ramp --seconds 10 --enable-outp
 
 All DAC test values are clamped to 0.0-3.3V before becoming DAC codes.
 
+## Smoke tests
+Run the software-only smoke test before bench work:
+
+```bash
+python3 -m src.smoke_test --simulate
+```
+
+The smoke test checks waveform generation, DAC clamping, DAC0/DAC1 simulation
+mapping, and that simulation mode does not import the hardware backends.
+
+## Calibration
+Default calibration lives in:
+
+```text
+config/calibration.json
+```
+
+The DAC path applies calibration before converting volts to a DAC code:
+
+```text
+calibrated_volts = volts * gain + offset
+```
+
+Print safe Pokit Pro calibration steps:
+
+```bash
+python3 -m src.calibrate
+```
+
+This command only prints instructions. Real output still requires using the DAC
+test utility with `--enable-output`, and only while watching the meter or scope.
+Measured full-scale may be around 3.28V instead of exactly 3.30V.
+
 ## Pokit Pro bench notes
 - Pokit black/COM to GND.
 - Pokit red/V to DAC0 or DAC1.
