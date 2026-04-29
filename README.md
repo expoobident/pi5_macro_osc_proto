@@ -50,10 +50,31 @@ python3 -m src.main --enable-output
 
 Running without either option exits before importing the hardware backends.
 
+## DAC test utility
+Start with simulation. It prints timestamp, channel, clamped volts, and DAC code
+without opening GPIO or SPI:
+
+```bash
+python3 -m src.dac_test --channel DAC0 --volts 1.65 --seconds 0
+python3 -m src.dac_test --channel DAC1 --pattern ramp --seconds 10
+python3 -m src.dac_test --channel DAC1 --pattern triangle --seconds 10
+```
+
+Real DAC output requires the explicit hardware opt-in:
+
+```bash
+python3 -m src.dac_test --channel DAC0 --volts 1.65 --seconds 0 --enable-output
+python3 -m src.dac_test --channel DAC1 --pattern ramp --seconds 10 --enable-output
+```
+
+All DAC test values are clamped to 0.0-3.3V before becoming DAC codes.
+
 ## Pokit Pro bench notes
-- Pokit black/COM goes to board GND.
-- Pokit red/V goes to DAC0 or DAC1.
+- Pokit black/COM to GND.
+- Pokit red/V to DAC0 or DAC1.
 - Expected DAC range is 0-3.3V.
+- Start in simulation mode first.
+- Only use `--enable-output` while watching the meter or scope.
 - Use DC coupling and a slow timebase for slow LFO-style signals.
 
 ## Notes

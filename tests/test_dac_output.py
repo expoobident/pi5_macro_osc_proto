@@ -9,6 +9,7 @@ from src.dac_output import (
     bipolar_to_voltage,
     clamp_u16,
     clamp_voltage,
+    dac_value_from_voltage,
     voltage_to_u16,
 )
 
@@ -40,6 +41,12 @@ class DacOutputTests(unittest.TestCase):
         self.assertEqual(bipolar_to_u16(99.0), DAC_MAX_CODE)
         self.assertEqual(clamp_u16(-10), 0)
         self.assertEqual(clamp_u16(DAC_MAX_CODE + 1), DAC_MAX_CODE)
+
+    def test_dac_value_from_voltage_uses_clamped_code_and_voltage(self) -> None:
+        dac_value = dac_value_from_voltage(4.2)
+
+        self.assertEqual(dac_value.voltage, 3.3)
+        self.assertEqual(dac_value.code, DAC_MAX_CODE)
 
 
 if __name__ == "__main__":
