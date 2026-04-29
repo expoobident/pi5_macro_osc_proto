@@ -25,12 +25,20 @@ class DAC8552:
         return bipolar_to_u16(value)
 
     def write_raw(self, channel_b: bool, value: int) -> None:
+        """Write and update one DAC8552 channel."""
         value = clamp_u16(value)
+
+        # DAC8552 24-bit frame:
+        # command/address byte, then full 16-bit DAC value.
+        # 0x10 = write/update DAC A
+        # 0x24 = write/update DAC B
+        command = 0x24 if channel_b else 0x10
         tx = [
-            (0x10 if channel_b else 0x00) | ((value >> 12) & 0x0F),
-            (value >> 4) & 0xFF,
-            ((value & 0x0F) << 4) & 0xFF,
+            command,
+            (value >> 8) & 0xFF,
+            value & 0xFF,
         ]
+
         with SPI_LOCK:
             self.gpio.write(config.PIN_DAC_CS, 0)
             self.spi.xfer2(tx)
