@@ -5,6 +5,7 @@ import threading
 import spidev
 
 from . import config
+from .dac_output import bipolar_to_u16, clamp_u16, voltage_to_u16
 from .gpio_backend import GPIOBackend
 
 SPI_LOCK = threading.Lock()
@@ -21,11 +22,10 @@ class DAC8552:
 
     @staticmethod
     def _float_to_u16(value: float) -> int:
-        x = max(-1.0, min(1.0, value))
-        unipolar = (x + 1.0) * 0.5
-        return int(round(unipolar * 65535.0))
+        return bipolar_to_u16(value)
 
     def write_raw(self, channel_b: bool, value: int) -> None:
+        value = clamp_u16(value)
         tx = [
             (0x10 if channel_b else 0x00) | ((value >> 12) & 0x0F),
             (value >> 4) & 0xFF,
@@ -41,6 +41,12 @@ class DAC8552:
 
     def write_b(self, value: float) -> None:
         self.write_raw(True, self._float_to_u16(value))
+
+    def write_voltage_a(self, voltage: float) -> None:
+        self.write_raw(False, voltage_to_u16(voltage))
+
+    def write_voltage_b(self, voltage: float) -> None:
+        self.write_raw(True, voltage_to_u16(voltage))
 
     def close(self) -> None:
         self.spi.close()

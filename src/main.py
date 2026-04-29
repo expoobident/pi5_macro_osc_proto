@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import argparse
 import threading
 import time
+from typing import Any
 
 from . import config
-from .controls import Controls
-from .gpio_backend import GPIOBackend
+from .dac_output import SimulationDAC
 from .oscillator import Oscillator
-from .spi_devices import ADS1256, DAC8552
 
 
 class SharedState:
@@ -20,7 +20,7 @@ class SharedState:
         self.lock = threading.Lock()
 
 
-def audio_loop(dac: DAC8552, state: SharedState) -> None:
+def audio_loop(dac: Any, state: SharedState) -> None:
     osc = Oscillator(config.AUDIO_HZ)
     period = 1.0 / config.AUDIO_HZ
     next_t = time.perf_counter()
@@ -46,7 +46,7 @@ def audio_loop(dac: DAC8552, state: SharedState) -> None:
             next_t = time.perf_counter()
 
 
-def control_loop(controls: Controls, state: SharedState) -> None:
+def control_loop(controls: Any, state: SharedState) -> None:
     period = 1.0 / config.CONTROL_HZ
     next_t = time.perf_counter()
     last_print = 0.0
@@ -83,7 +83,36 @@ def control_loop(controls: Controls, state: SharedState) -> None:
             next_t = time.perf_counter()
 
 
-def main() -> None:
+def run_simulation(
+    samples: int,
+    pitch_hz: float,
+    timbre: float,
+    morph: float,
+    index: float,
+) -> None:
+    osc = Oscillator(config.AUDIO_HZ)
+    dac = SimulationDAC()
+
+    print("Simulation mode: no GPIO, SPI, ADC, or DAC hardware will be opened.")
+    print("sample DAC0_volts DAC0_code DAC1_volts DAC1_code")
+
+    for sample in range(samples):
+        osc.set_params(pitch_hz, timbre, morph, index)
+        main, aux = osc.render()
+        dac0 = dac.write_a(main)
+        dac1 = dac.write_b(aux)
+        print(
+            f"{sample:06d} "
+            f"{dac0.voltage:0.6f} {dac0.code:05d} "
+            f"{dac1.voltage:0.6f} {dac1.code:05d}"
+        )
+
+
+def run_hardware() -> None:
+    from .controls import Controls
+    from .gpio_backend import GPIOBackend
+    from .spi_devices import ADS1256, DAC8552
+
     gpio = GPIOBackend()
     adc = ADS1256(gpio)
     dac = DAC8552(gpio)
@@ -113,6 +142,59 @@ def main() -> None:
         adc.close()
         dac.close()
         gpio.close()
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Pi 5 macro oscillator prototype",
+    )
+    parser.add_argument(
+        "--simulate",
+        action="store_true",
+        help="run without touching GPIO/SPI hardware and print DAC0/DAC1 values",
+    )
+    parser.add_argument(
+        "--enable-output",
+        action="store_true",
+        help="allow real GPIO/SPI/ADC/DAC hardware output",
+    )
+    parser.add_argument(
+        "--samples",
+        type=int,
+        default=32,
+        help="number of generated samples to print in simulation mode",
+    )
+    parser.add_argument("--pitch-hz", type=float, default=1.0)
+    parser.add_argument("--timbre", type=float, default=0.0)
+    parser.add_argument("--morph", type=float, default=0.0)
+    parser.add_argument("--index", type=float, default=0.0)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if args.samples < 1:
+        parser.error("--samples must be at least 1")
+
+    if args.simulate:
+        run_simulation(
+            samples=args.samples,
+            pitch_hz=args.pitch_hz,
+            timbre=args.timbre,
+            morph=args.morph,
+            index=args.index,
+        )
+        return
+
+    if not args.enable_output:
+        parser.error(
+            "real hardware output is disabled by default; use --simulate for "
+            "software-only output or --enable-output to allow GPIO/SPI/DAC access"
+        )
+
+    run_hardware()
 
 
 if __name__ == "__main__":
