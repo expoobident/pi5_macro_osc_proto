@@ -18,7 +18,7 @@ class DacCalibration:
 @dataclass(frozen=True)
 class AdcCalibration:
     minimum: float = 0.0
-    maximum: float = 1.0
+    maximum: float = 8388607.0
 
 
 @dataclass(frozen=True)

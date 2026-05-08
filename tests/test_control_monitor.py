@@ -6,6 +6,7 @@ from io import StringIO
 import json
 import unittest
 
+from src.calibration import Calibration, AdcCalibration, DacCalibration
 from src import control_monitor
 
 
@@ -61,6 +62,24 @@ class ControlMonitorTests(unittest.TestCase):
         self.assertEqual(rows[0]["channel"], "AD4")
         self.assertEqual(rows[0]["control"], "pitch")
         self.assertIn("mapped", rows[0])
+
+    def test_simulation_raw_values_follow_channel_calibration_ranges(self) -> None:
+        calibration = Calibration(
+            dac0=DacCalibration(),
+            dac1=DacCalibration(),
+            adc={
+                "AD1": AdcCalibration(10.0, 20.0),
+                "AD2": AdcCalibration(100.0, 200.0),
+                "AD3": AdcCalibration(1000.0, 2000.0),
+                "AD4": AdcCalibration(10000.0, 20000.0),
+            },
+        )
+
+        readings = control_monitor.collect_simulated_readings(3, calibration)
+        pitch_readings = [reading for reading in readings if reading.adc_name == "AD4"]
+
+        self.assertEqual([reading.raw_value for reading in pitch_readings], [10000.0, 15000.0, 20000.0])
+        self.assertEqual([reading.normalized for reading in pitch_readings], [0.0, 0.5, 1.0])
 
 
 if __name__ == "__main__":

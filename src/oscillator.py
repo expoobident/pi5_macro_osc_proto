@@ -18,6 +18,9 @@ class Oscillator:
         self.morph = max(0.0, min(1.0, morph))
         self.index = max(0.0, min(1.0, index))
 
+    def reset(self) -> None:
+        self.phase = 0.0
+
     @staticmethod
     def _tri(phase: float) -> float:
         x = 2.0 * phase - 1.0
@@ -33,14 +36,10 @@ class Oscillator:
         tri = self._tri(self.phase)
         square = 1.0 if self.phase < 0.5 else -1.0
 
-        # Main: triangle -> saw morph
         main = tri * (1.0 - self.morph) + saw * self.morph
-
-        # Timbre: gentle saturation only
         drive = 1.0 + self.timbre * 2.0
         main = math.tanh(main * drive)
 
-        # Aux: triangle -> square blend
         aux = tri * (1.0 - self.index) + square * self.index
 
         return max(-1.0, min(1.0, main)), max(-1.0, min(1.0, aux))

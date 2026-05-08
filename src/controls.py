@@ -33,22 +33,22 @@ class Controls:
 
     def update(self) -> ControlState:
         pitch_n = normalize_adc_value(
-            self.adc.read_channel_norm01(config.ADC_CH_PITCH),
+            self.adc.read_channel_raw(config.ADC_CH_PITCH),
             "AD4",
             self.calibration,
         )
         timbre_n = normalize_adc_value(
-            self.adc.read_channel_norm01(config.ADC_CH_TIMBRE),
+            self.adc.read_channel_raw(config.ADC_CH_TIMBRE),
             "AD1",
             self.calibration,
         )
         morph_n = normalize_adc_value(
-            self.adc.read_channel_norm01(config.ADC_CH_MORPH),
+            self.adc.read_channel_raw(config.ADC_CH_MORPH),
             "AD2",
             self.calibration,
         )
         index_n = normalize_adc_value(
-            self.adc.read_channel_norm01(config.ADC_CH_INDEX),
+            self.adc.read_channel_raw(config.ADC_CH_INDEX),
             "AD3",
             self.calibration,
         )

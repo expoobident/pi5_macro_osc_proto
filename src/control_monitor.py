@@ -22,12 +22,24 @@ def hardware_modules_loaded() -> list[str]:
     return [module for module in HARDWARE_MODULES if module in sys.modules]
 
 
-def simulated_raw_value(sample: int, channel_index: int, total_samples: int) -> float:
+def simulated_normalized_value(sample: int, total_samples: int) -> float:
     if total_samples <= 1:
-        base = 0.5
-    else:
-        base = sample / total_samples
-    return (base + channel_index * 0.17) % 1.0
+        return 0.5
+    return sample / (total_samples - 1)
+
+
+def simulated_raw_value(
+    sample: int,
+    channel_name: str,
+    total_samples: int,
+    calibration: Calibration,
+) -> float:
+    adc_calibration = calibration.adc[channel_name]
+    normalized = simulated_normalized_value(sample, total_samples)
+    span = adc_calibration.maximum - adc_calibration.minimum
+    if span <= 0.0:
+        return adc_calibration.minimum
+    return adc_calibration.minimum + span * normalized
 
 
 def collect_simulated_readings(
@@ -38,11 +50,16 @@ def collect_simulated_readings(
         reading_from_raw(
             sample=sample,
             channel=channel,
-            raw_value=simulated_raw_value(sample, channel_index, samples),
+            raw_value=simulated_raw_value(
+                sample,
+                channel.adc_name,
+                samples,
+                calibration,
+            ),
             calibration=calibration,
         )
         for sample in range(samples)
-        for channel_index, channel in enumerate(CONTROL_CHANNELS)
+        for channel in CONTROL_CHANNELS
     ]
 
 

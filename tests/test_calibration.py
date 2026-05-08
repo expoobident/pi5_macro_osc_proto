@@ -15,8 +15,8 @@ from src.dac_output import dac_value_from_voltage, voltage_to_u16
 
 
 class CalibrationTests(unittest.TestCase):
-    def test_default_calibration_values_load_from_config(self) -> None:
-        calibration = load_calibration()
+    def test_default_calibration_values_are_safe_fallbacks(self) -> None:
+        calibration = default_calibration()
 
         self.assertEqual(calibration.dac0.gain, 1.0)
         self.assertEqual(calibration.dac0.offset_volts, 0.0)
@@ -24,7 +24,37 @@ class CalibrationTests(unittest.TestCase):
         self.assertEqual(calibration.dac1.offset_volts, 0.0)
         self.assertEqual(set(calibration.adc), {"AD1", "AD2", "AD3", "AD4"})
         self.assertEqual(calibration.adc["AD1"].minimum, 0.0)
-        self.assertEqual(calibration.adc["AD1"].maximum, 1.0)
+        self.assertEqual(calibration.adc["AD1"].maximum, 8388607.0)
+
+    def test_measured_calibration_file_values_are_allowed(self) -> None:
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "calibration.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "adc_min": {
+                            "AD1": 556137.0,
+                            "AD2": 89868.0,
+                            "AD3": 89345.0,
+                            "AD4": 88910.0,
+                        },
+                        "adc_max": {
+                            "AD1": 5090032.0,
+                            "AD2": 8387113.0,
+                            "AD3": 8383753.0,
+                            "AD4": 8381820.0,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            calibration = load_calibration(path)
+
+        self.assertEqual(calibration.dac0.gain, 1.0)
+        self.assertEqual(calibration.dac1.offset_volts, 0.0)
+        self.assertEqual(calibration.adc["AD1"].minimum, 556137.0)
+        self.assertEqual(calibration.adc["AD4"].maximum, 8381820.0)
 
     def test_adc_normalization_uses_calibration_min_max(self) -> None:
         with TemporaryDirectory() as tmp:
